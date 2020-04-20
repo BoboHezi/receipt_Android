@@ -2,9 +2,6 @@ package com.example.receipt;
 
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -15,12 +12,11 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 public class ChoosePicActivity extends AppCompatActivity {
@@ -32,50 +28,17 @@ public class ChoosePicActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pic);
 
-        List<String> assetsPictures = getAssetPicPath();
-        for (String item : assetsPictures) {
-            assetsPictures.set(assetsPictures.indexOf(item), "assets#" + item);
+        List<String> filePictures = Utils.getAvailablePics(this);
+        for (String item : filePictures) {
+            filePictures.set(filePictures.indexOf(item), "file#" + item);
             Log.i(TAG, "item: " + item);
         }
 
         RecyclerView rv = findViewById(R.id.receipt_rv);
-        PicsAdapter adapter = new PicsAdapter(this, assetsPictures);
-        rv.setLayoutManager(new GridLayoutManager(this, 2));
+        PicsAdapter adapter = new PicsAdapter(this, filePictures);
+        rv.setLayoutManager(new LinearLayoutManager(this));
         rv.setAdapter(adapter);
-    }
-
-    private List<String> getAssetPicPath(){
-        AssetManager am = getAssets();
-        String[] path = null;
-        try {
-            path = am.list("");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        List<String> pciPaths = new ArrayList<>();
-        for(int i = 0; i < path.length; i++){
-            if (path[i].endsWith(".jpg")){
-                pciPaths.add(path[i]);
-            }
-        }
-        return pciPaths;
-    }
-
-    /** 根据路径获取Bitmap图片
-     * @param path
-     * @return
-     */
-    private Bitmap getAssetsBitmap(String path){
-        AssetManager am = getAssets();
-        InputStream inputStream = null;
-        try {
-            inputStream = am.open(path);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-        return bitmap;
+        rv.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
     }
 
     class PicsAdapter extends RecyclerView.Adapter<PicsAdapter.PictureHolder> {
@@ -92,7 +55,7 @@ public class ChoosePicActivity extends AppCompatActivity {
         @NonNull
         @Override
         public PictureHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new PictureHolder(LayoutInflater.from(context).inflate(R.layout.item_picture, null));
+            return new PictureHolder(LayoutInflater.from(context).inflate(R.layout.item_picture, parent, false));
         }
 
         @Override
@@ -109,10 +72,11 @@ public class ChoosePicActivity extends AppCompatActivity {
             path = path.split("#")[1];
 
             if (type == 1) {
-                holder.thumbnail.setImageBitmap(getAssetsBitmap(path));
+                holder.thumbnail.setImageBitmap(Utils.getAssetsBitmap(ChoosePicActivity.this, path));
                 holder.description.setText(path);
             } else if (type == 2) {
-
+                holder.thumbnail.setImageBitmap(Utils.revisionImageSize(path, 800, 800));
+                holder.description.setText(path);
             }
             holder.itemView.setOnClickListener(view -> {
                 setResult(RESULT_OK, new Intent().putExtra("file_path", pictures.get(position)));
