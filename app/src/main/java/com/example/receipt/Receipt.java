@@ -17,6 +17,8 @@ public class Receipt {
     public static final String TIME_PATTERN_5 = "[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}";
     public static final String TIME_PATTERN_6 = "[0-9]{1,2}:[0-9]{1,2}";
 
+    public static final String GOODS_COUNT_PATTERN = "×[0-9]*";
+
     public int mType;
 
     public String mTime;

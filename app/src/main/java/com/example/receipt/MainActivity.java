@@ -28,6 +28,7 @@ import com.google.gson.GsonBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -142,15 +143,28 @@ public class MainActivity extends AppCompatActivity {
         if (bean.type == Receipt.TYPE_MEITUAN) {
             datePattern = Receipt.DATE_PATTERN_1;
             timePattern = Receipt.TIME_PATTERN_5;
+            ReceiptBean.WordBean shopBean = bean.words_result.get(
+                    bean.words_result.indexOf(match(bean, "美团外卖")) + 1);
+            receipt.mShop = shopBean != null ? shopBean.words : "";
         } else if (bean.type == Receipt.TYPE_ELE) {
             datePattern = Receipt.DATE_PATTERN_2;
             timePattern = Receipt.TIME_PATTERN_5;
+            ReceiptBean.WordBean shopBean = bean.words_result.get(
+                    bean.words_result.indexOf(match(bean, "饿了么订单")) + 1);
+            receipt.mShop = shopBean != null ? shopBean.words : "";
         } else if (bean.type == Receipt.TYPE_WALMART) {
             datePattern = Receipt.DATE_PATTERN_3;
             timePattern = Receipt.TIME_PATTERN_5;
+            ReceiptBean.WordBean shopBean = bean.words_result.get(
+                    bean.words_result.indexOf(match(bean, "本店受理")) + 1);
+            receipt.mShop = shopBean != null ? shopBean.words : "";
         } else if (bean.type == Receipt.TYPE_OTHER) {
             datePattern = Receipt.DATE_PATTERN_4;
             timePattern = Receipt.TIME_PATTERN_6;
+            ReceiptBean.WordBean shopBean = match(bean, "欢迎光临");
+            receipt.mShop = shopBean != null ? shopBean.words.substring(4) : "";
+        } else {
+            return;
         }
 
         ReceiptBean.WordBean dateWord = match(bean, datePattern);
@@ -159,7 +173,10 @@ public class MainActivity extends AppCompatActivity {
         final String dateStr = dateWord != null ? match(datePattern, dateWord.words) : "";
         final String timeStr = timeWord != null ? match(timePattern, timeWord.words) : "";
 
-        String msg = path + (dateWord != null ? ", date: " + dateWord.words : "") + (timeWord != null ? ", time: " + timeWord.words : "");
+        String msg = path + ", dateStr: " + dateStr + ", timeStr: " + timeStr;
+
+        receipt.mTime = ((dateStr != null) ? dateStr : "") + ((timeStr != null) ? timeStr : "");
+
         Log.i(TAG, msg);
     }
 
@@ -174,6 +191,20 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         return null;
+    }
+
+    private List<ReceiptBean.WordBean> matchs(ReceiptBean bean, String pattern) {
+        List<ReceiptBean.WordBean> beans = new ArrayList<>();
+        if (bean.words_result_num > 0) {
+            Pattern ptn = Pattern.compile(pattern);
+            for (ReceiptBean.WordBean word : bean.words_result) {
+                Matcher matcher = ptn.matcher(word.words);
+                if (matcher.find()) {
+                    beans.add(word);
+                }
+            }
+        }
+        return beans;
     }
 
     private String match(String pattern, String input) {
