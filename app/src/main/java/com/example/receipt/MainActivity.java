@@ -3,7 +3,6 @@ package com.example.receipt;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 
@@ -15,28 +14,23 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.MultipartBody;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.internal.Util;
 
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Toast;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 
-import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import static androidx.constraintlayout.widget.Constraints.TAG;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -56,6 +50,11 @@ public class MainActivity extends AppCompatActivity {
         setSupportActionBar(toolbar);
 
         requestPermission();
+
+        decodeReceipt("/sdcard/receipt/json/receipt1.jpg.json");
+        decodeReceipt("/sdcard/receipt/json/receipt2.jpg.json");
+        decodeReceipt("/sdcard/receipt/json/receipt3.jpg.json");
+        decodeReceipt("/sdcard/receipt/json/receipt4.jpg.json");
     }
 
     private void requestPermission() {
@@ -67,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (request.isEmpty()) {
-                Utils.saveAssets2File(this);
+                /*Utils.saveAssets2File(this);*/
                 return;
             }
             String[] items = new String[request.size()];
@@ -76,53 +75,151 @@ public class MainActivity extends AppCompatActivity {
             }
             ActivityCompat.requestPermissions(this, items, 2);
         }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+        /*if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Utils.saveAssets2File(this);
-        }
+        }*/
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+        /*if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             Utils.saveAssets2File(this);
-        }
+        }*/
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK && requestCode == 123) {
-            String path = data.getStringExtra("file_path");
-            Log.i(TAG, "onActivityResult: " + path);
+            final String path = data.getStringExtra("file_path");
+            final int type = data.getIntExtra("type", 0);
 
-            final String jsonFile = "/sdcard/receipt/json/" + path.split("/")[3] + ".json";
+            Log.i(TAG, "onActivityResult: " + path + ", type: " + Integer.toBinaryString(type));
+            String fileName = new File(path).getName();
+            final String jsonFile = "/sdcard/receipt/json/" + fileName + ".json";
 
             if (new File(jsonFile).exists()) {
-                displayReceipt(jsonFile);
+                displayReceipt(jsonFile, 1f, 0.4f);
                 Log.i(TAG, "result already exist.");
             } else {
-                Utils.uploadFile(path.split("#")[1], OCR_UPLOAD_URL, new Callback() {
+                Utils.uploadFile(path, OCR_UPLOAD_URL, new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
-                        Log.i(TAG, "onFailure: " + e.getMessage());
+                        Log.i(TAG, "onFailure: " + e.toString());
                     }
 
                     @Override
                     public void onResponse(Call call, Response response) throws IOException {
                         final String result = response.body().string();
                         Log.i(TAG, "onResponse result: \n" + result);
-                        Utils.saveJson(result, jsonFile);
 
-                        displayReceipt(jsonFile);
+                        ReceiptBean bean = new Gson().fromJson(result, ReceiptBean.class);
+                        if (bean != null && bean.log_id > 0) {
+                            bean.type = type;
+                            GsonBuilder gsonBuilder = new GsonBuilder();
+                            gsonBuilder.setPrettyPrinting();
+                            Gson gson = gsonBuilder.create();
+
+                            Utils.saveJson(gson.toJson(bean), jsonFile);
+                            runOnUiThread(() -> displayReceipt(jsonFile, 1f, 0.4f));
+                        }
                     }
                 });
             }
         }
     }
 
-    private void displayReceipt(String path) {
+    private void decodeReceipt(String path) {
         ReceiptBean bean = Utils.decodeJson(path);
+
+        Receipt receipt = new Receipt();
+        receipt.mType = bean.type;
+
+        String datePattern = null;
+        String timePattern = null;
+
+        if (bean.type == Receipt.TYPE_MEITUAN) {
+            datePattern = Receipt.DATE_PATTERN_1;
+            timePattern = Receipt.TIME_PATTERN_5;
+        } else if (bean.type == Receipt.TYPE_ELE) {
+            datePattern = Receipt.DATE_PATTERN_2;
+            timePattern = Receipt.TIME_PATTERN_5;
+        } else if (bean.type == Receipt.TYPE_WALMART) {
+            datePattern = Receipt.DATE_PATTERN_3;
+            timePattern = Receipt.TIME_PATTERN_5;
+        } else if (bean.type == Receipt.TYPE_OTHER) {
+            datePattern = Receipt.DATE_PATTERN_4;
+            timePattern = Receipt.TIME_PATTERN_6;
+        }
+
+        ReceiptBean.WordBean dateWord = match(bean, datePattern);
+        ReceiptBean.WordBean timeWord = match(bean, timePattern);
+
+        final String dateStr = dateWord != null ? match(datePattern, dateWord.words) : "";
+        final String timeStr = timeWord != null ? match(timePattern, timeWord.words) : "";
+
+        String msg = path + (dateWord != null ? ", date: " + dateWord.words : "") + (timeWord != null ? ", time: " + timeWord.words : "");
+        Log.i(TAG, msg);
+    }
+
+    private ReceiptBean.WordBean match(ReceiptBean bean, String pattern) {
+        if (bean.words_result_num > 0) {
+            Pattern ptn = Pattern.compile(pattern);
+            for (ReceiptBean.WordBean word : bean.words_result) {
+                Matcher matcher = ptn.matcher(word.words);
+                if (matcher.find()) {
+                    return word;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String match(String pattern, String input) {
+        Pattern ptn = Pattern.compile(pattern);
+        Matcher matcher = ptn.matcher(input);
+        if (matcher.find()) {
+            return input.substring(matcher.start(), matcher.end());
+        }
+
+        return null;
+    }
+
+    private void displayReceipt(String path, float sizeScale, float textScale) {
+        ReceiptBean bean = Utils.decodeJson(path);
+        FrameLayout container = findViewById(R.id.receipt_container);
+
+        if (bean.words_result_num > 0) {
+            int maxWidth = 0;
+            int screenWidth = getResources().getDisplayMetrics().widthPixels;
+            for (ReceiptBean.WordBean word : bean.words_result) {
+                int width = word.location.left + word.location.width;
+                maxWidth = width > maxWidth ? width : maxWidth;
+            }
+
+            float scale = ((float) screenWidth / (float) maxWidth);
+
+            Log.i(TAG, "screenWidth: " + screenWidth + ", maxWidth: " + maxWidth + ", scale: " + scale);
+
+            container.removeAllViews();
+            for (ReceiptBean.WordBean word : bean.words_result) {
+                TextView tv = new TextView(this);
+                tv.setText(word.words);
+                tv.setTextSize(word.location.height * textScale * scale);
+                tv.setMinWidth((int) (word.location.width * sizeScale * scale));
+                tv.setMinHeight((int) (word.location.height * sizeScale * scale));
+                tv.setLineSpacing(1, 10);
+                container.addView(tv);
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) tv.getLayoutParams();
+                lp.width = FrameLayout.LayoutParams.WRAP_CONTENT;
+                lp.height = FrameLayout.LayoutParams.WRAP_CONTENT;
+
+                lp.topMargin = (int) (word.location.top * sizeScale * scale);
+                lp.leftMargin = (int) (word.location.left * sizeScale * scale);
+                tv.setLayoutParams(lp);
+            }
+        }
     }
 
     @Override

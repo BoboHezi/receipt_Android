@@ -2,7 +2,13 @@ package com.example.receipt;
 
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,26 +17,41 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.DividerItemDecoration;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ChoosePicActivity extends AppCompatActivity {
 
     private static final String TAG = "ChoosePicActivity";
+
+    public static final Map<String, String> TEMPLATES = new HashMap<String, String>() {
+        {
+            put("receipt1.jpg", "美团订单");
+            put("receipt2.jpg", "饿了么订单");
+            put("receipt3.jpg", "沃尔玛小票");
+            put("receipt4.jpg", "普通小票");
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pic);
 
-        List<String> filePictures = Utils.getAvailablePics(this);
+        List<String> filePictures = Utils.getAssetPics(this);
         for (String item : filePictures) {
-            filePictures.set(filePictures.indexOf(item), "file#" + item);
+            filePictures.set(filePictures.indexOf(item), "assets#" + item);
             Log.i(TAG, "item: " + item);
         }
 
@@ -73,14 +94,31 @@ public class ChoosePicActivity extends AppCompatActivity {
 
             if (type == 1) {
                 holder.thumbnail.setImageBitmap(Utils.getAssetsBitmap(ChoosePicActivity.this, path));
-                holder.description.setText(path);
             } else if (type == 2) {
                 holder.thumbnail.setImageBitmap(Utils.revisionImageSize(path, 800, 800));
-                holder.description.setText(path);
             }
+
+            for (String key : TEMPLATES.keySet()) {
+                if (path.contains(key)) {
+                    holder.description.setText(TEMPLATES.get(key));
+                    break;
+                }
+            }
+
+            String finalPath = path;
             holder.itemView.setOnClickListener(view -> {
-                setResult(RESULT_OK, new Intent().putExtra("file_path", pictures.get(position)));
-                finish();
+                int requestCode = 0;
+                if (finalPath.contains("receipt1")) {
+                    requestCode = Receipt.TYPE_MEITUAN;
+                } else if (finalPath.contains("receipt2")) {
+                    requestCode = Receipt.TYPE_ELE;
+                } else if (finalPath.contains("receipt3")) {
+                    requestCode = Receipt.TYPE_WALMART;
+                } else if (finalPath.contains("receipt4")) {
+                    requestCode = Receipt.TYPE_OTHER;
+                }
+                Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                startActivityForResult(intent, requestCode);
             });
         }
 
@@ -100,6 +138,59 @@ public class ChoosePicActivity extends AppCompatActivity {
                 thumbnail = itemView.findViewById(R.id.thumbnail);
                 description = itemView.findViewById(R.id.description);
             }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if ((requestCode | 0b100) == 0b100 && resultCode == RESULT_OK) {
+            Uri selectedImage = data.getData();
+
+            String[] filePathColumn = { MediaStore.Images.Media.DATA };
+            Cursor cursor = getContentResolver().query(selectedImage,
+                    filePathColumn, null, null, null);
+            cursor.moveToFirst();
+
+            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+            String picturePath = cursor.getString(columnIndex);
+            cursor.close();
+            Log.i(TAG, "picturePath: " + picturePath);
+
+            final String cacheFile = "/sdcard/receipt/" + new File(picturePath).getName();
+
+            new AsyncTask() {
+                @Override
+                protected Object doInBackground(Object[] objects) {
+                    try {
+                        int rawSize = new FileInputStream(new File(picturePath)).available();
+                        int quality = rawSize > 1048576 ? (1048576 * 100 / rawSize) : 100;
+                        Log.i(TAG, "raw size: " + rawSize + ", quality: " + quality);
+
+                        Bitmap raw = BitmapFactory.decodeFile(picturePath);
+                        Bitmap cache = Utils.compressImage(raw, quality);
+
+                        Utils.saveBitmap(cache, cacheFile);
+
+                        return true;
+                    } catch (FileNotFoundException e) {
+                        Log.e(TAG, "FileNotFoundException: ", e);
+                    } catch (IOException e) {
+                        Log.e(TAG, "IOException: ", e);
+                    }
+                    return false;
+                }
+
+                @Override
+                protected void onPostExecute(Object o) {
+                    super.onPostExecute(o);
+                    if ((Boolean) o) {
+                        setResult(RESULT_OK, new Intent()
+                                .putExtra("file_path", cacheFile)
+                                .putExtra("type", requestCode));
+                        finish();
+                    }
+                }
+            }.execute();
         }
     }
 }

@@ -4,6 +4,8 @@ import java.util.List;
 
 public class ReceiptBean {
 
+    public int type;
+
     public long log_id;
 
     public int words_result_num;
