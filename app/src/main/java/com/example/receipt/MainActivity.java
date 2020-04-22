@@ -52,10 +52,10 @@ public class MainActivity extends AppCompatActivity {
 
         requestPermission();
 
-        decodeReceipt("/sdcard/receipt/json/receipt1.jpg.json");
-        decodeReceipt("/sdcard/receipt/json/receipt2.jpg.json");
-        decodeReceipt("/sdcard/receipt/json/receipt3.jpg.json");
-        decodeReceipt("/sdcard/receipt/json/receipt4.jpg.json");
+        //decodeReceipt("/sdcard/receipt/mmexport1587566290321.jpg.json");
+        decodeReceipt("/sdcard/receipt/mmexport1587566298725.jpg.json");
+        //decodeReceipt("/sdcard/receipt/mmexport1587455945602.jpg.json");
+        //decodeReceipt("/sdcard/receipt/mmexport1587566302140.jpg.json");
     }
 
     private void requestPermission() {
@@ -101,7 +101,8 @@ public class MainActivity extends AppCompatActivity {
             final String jsonFile = "/sdcard/receipt/json/" + fileName + ".json";
 
             if (new File(jsonFile).exists()) {
-                displayReceipt(jsonFile, 1f, 0.4f);
+                decodeReceipt(jsonFile);
+                //displayReceipt(jsonFile, 1f, 0.4f);
                 Log.i(TAG, "result already exist.");
             } else {
                 Utils.uploadFile(path, OCR_UPLOAD_URL, new Callback() {
@@ -123,7 +124,8 @@ public class MainActivity extends AppCompatActivity {
                             Gson gson = gsonBuilder.create();
 
                             Utils.saveJson(gson.toJson(bean), jsonFile);
-                            runOnUiThread(() -> displayReceipt(jsonFile, 1f, 0.4f));
+                            runOnUiThread(() -> decodeReceipt(jsonFile));
+                            //runOnUiThread(() -> displayReceipt(jsonFile, 1f, 0.4f));
                         }
                     }
                 });
@@ -133,6 +135,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void decodeReceipt(String path) {
         ReceiptBean bean = Utils.decodeJson(path);
+        if (bean == null) {
+            return;
+        }
 
         Receipt receipt = new Receipt();
         receipt.mType = bean.type;
@@ -185,8 +190,10 @@ public class MainActivity extends AppCompatActivity {
         //总计金额
         ReceiptBean.WordBean totalPriceBean = match(bean, Receipt.TOTAL_PRICE_PATTERN, totalPerceOffset);
         final String priceTitle = totalPriceBean != null ? match(Receipt.TOTAL_PRICE_PATTERN, totalPriceBean.words) : "";
-        final String totalPrice = priceTitle != null ? totalPriceBean.words.substring(priceTitle.length()) : totalPriceBean.words;
-        receipt.mActualPrice = Float.valueOf(totalPrice);
+        final String totalPrice = totalPriceBean == null ? "" : priceTitle != null ? totalPriceBean.words.substring(priceTitle.length()) : totalPriceBean.words;
+        if (!TextUtils.isEmpty(totalPrice)) {
+            receipt.mActualPrice = Float.valueOf(totalPrice);
+        }
         //商品
         if (type == Receipt.TYPE_MEITUAN || type == Receipt.TYPE_ELE) {
             List<ReceiptBean.WordBean> goodsTemp = matches(bean, Receipt.GOODS_COUNT_PATTERN);
@@ -208,18 +215,20 @@ public class MainActivity extends AppCompatActivity {
             int start = bean.words_result.indexOf(match(bean, "商店[0-9]*店员[0-9]*", 1));
             int end = bean.words_result.indexOf(totalPriceBean) - 1;
 
-            for (;start <= end; start ++) {
-                ReceiptBean.WordBean word = bean.words_result.get(start);
-                String serial = match("[0-9]{10,}", word.words);
-                if (!TextUtils.isEmpty(serial)) {
-                    Receipt.Goods goods = receipt.new Goods();
-                    goods.price = matchNumber(bean.words_result.get(start + 1).words);
-                    if (serial.equals(word.words)) {
-                        goods.mName = bean.words_result.get(start - 1).words;
-                    } else {
-                        goods.mName = word.words.substring(0, word.words.indexOf(serial));
+            if (start > 0 && end < bean.words_result.size()) {
+                for (;start <= end; start ++) {
+                    ReceiptBean.WordBean word = bean.words_result.get(start);
+                    String serial = match("[0-9]{10,}", word.words);
+                    if (!TextUtils.isEmpty(serial)) {
+                        Receipt.Goods goods = receipt.new Goods();
+                        goods.price = matchNumber(bean.words_result.get(start + 1).words);
+                        if (serial.equals(word.words)) {
+                            goods.mName = bean.words_result.get(start - 1).words;
+                        } else {
+                            goods.mName = word.words.substring(0, word.words.indexOf(serial));
+                        }
+                        receipt.mGoods.put(goods, 1);
                     }
-                    receipt.mGoods.put(goods, 1);
                 }
             }
         } else if (type == Receipt.TYPE_OTHER) {
@@ -250,7 +259,37 @@ public class MainActivity extends AppCompatActivity {
             receipt.mTotalPrice = price;
             receipt.mTotalGoods = count;
         }
-        Log.i(TAG, receipt.toString());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(getString(R.string.shop_name, receipt.mShop));
+        sb.append("\n");
+        sb.append(getString(R.string.receipt_time, receipt.mTime));
+        sb.append("\n");
+        sb.append(getString(R.string.goods));
+        for (Receipt.Goods goods : receipt.mGoods.keySet()) {
+            sb.append("\n    ");
+            sb.append(goods.mName);
+            sb.append("    ");
+            sb.append(receipt.mGoods.get(goods));
+            sb.append("    ");
+            sb.append(goods.price > 0 ? goods.price : 0);
+        }
+        sb.append("\n\n");
+        sb.append(getString(R.string.actual_price, receipt.mActualPrice));
+        sb.append("\n");
+        sb.append(getString(R.string.total_price, receipt.mTotalPrice));
+        sb.append("\n");
+        sb.append(getString(R.string.goods_count, receipt.mTotalGoods));
+
+        FrameLayout container = findViewById(R.id.receipt_container);
+        container.removeAllViews();
+        TextView tv = new TextView(this);
+        tv.setText(sb.toString());
+        tv.setTextSize(23);
+        tv.setLineSpacing(10, 1.3f);
+        container.addView(tv);
+
+        Log.i(TAG, sb.toString());
     }
 
     private ReceiptBean.WordBean match(ReceiptBean bean, String pattern, int offset) {
@@ -298,7 +337,7 @@ public class MainActivity extends AppCompatActivity {
             return Float.parseFloat(input.substring(mth.start(), mth.end()));
         }
 
-        return Float.MIN_VALUE;
+        return -1;
     }
 
     private void displayReceipt(String path, float sizeScale, float textScale) {

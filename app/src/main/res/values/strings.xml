@@ -1,6 +1,13 @@
-<resources>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_name">Receipt</string>
     <string name="action_settings">Settings</string>
     <string name="title_receipt">提取小票信息</string>
     <string name="pick_picture">选择图片</string>
+    
+    <string name="shop_name">商品名：<xliff:g id="name">%s</xliff:g></string>
+    <string name="receipt_time">小票日期：<xliff:g id="name">%s</xliff:g></string>
+    <string name="goods">商品详情：</string>
+    <string name="actual_price">小票实际付款金额：<xliff:g id="name">%.2f</xliff:g></string>
+    <string name="total_price">小票商品总金额：<xliff:g id="name">%.2f</xliff:g></string>
+    <string name="goods_count">小票商品总数目：<xliff:g id="name">%d</xliff:g></string>
 </resources>

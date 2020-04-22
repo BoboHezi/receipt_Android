@@ -143,7 +143,7 @@ public class ChoosePicActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if ((requestCode | 0b100) == 0b100 && resultCode == RESULT_OK) {
+        if ((requestCode & 0b100) == 0b100 && resultCode == RESULT_OK) {
             Uri selectedImage = data.getData();
 
             String[] filePathColumn = { MediaStore.Images.Media.DATA };
