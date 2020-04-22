@@ -162,6 +162,10 @@ public class ChoosePicActivity extends AppCompatActivity {
                 @Override
                 protected Object doInBackground(Object[] objects) {
                     try {
+                        if (new File(cacheFile).exists()) {
+                            return true;
+                        }
+
                         int rawSize = new FileInputStream(new File(picturePath)).available();
                         int quality = rawSize > 1048576 ? (1048576 * 100 / rawSize) : 100;
                         Log.i(TAG, "raw size: " + rawSize + ", quality: " + quality);
