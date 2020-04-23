@@ -97,7 +97,7 @@ public class DecodeTask extends AsyncTask<Object, ViewGroup, Receipt> {
         } else if (type == Receipt.TYPE_ELE) {
             datePattern = Receipt.DATE_PATTERN_2;
             timePattern = Receipt.TIME_PATTERN_5;
-            shopPattern = "饿了么订单";
+            shopPattern = "饿了么订单|饿了么";
             shopOffset = 1;
         } else if (type == Receipt.TYPE_WALMART) {
             datePattern = Receipt.DATE_PATTERN_3;
@@ -131,6 +131,74 @@ public class DecodeTask extends AsyncTask<Object, ViewGroup, Receipt> {
         //商品
         if (type == Receipt.TYPE_MEITUAN || type == Receipt.TYPE_ELE) {
             List<ReceiptBean.WordBean> goodsTemp = matches(bean, Receipt.GOODS_COUNT_PATTERN);
+            if (goodsTemp == null || goodsTemp.isEmpty()) {
+                int start = bean.words_result.indexOf(match(bean, "号篮", 1));
+                int end = bean.words_result.indexOf(match(bean, "单品折扣", -1));
+                if (start > 0 && end < bean.words_result.size()) {
+                    String goodsName = null;
+                    int count = -1;
+                    float price = -1;
+                    int index = 0;
+                    for (; start <= end; start++) {
+                        ReceiptBean.WordBean word = bean.words_result.get(start);
+                        if (index % 3 == 0) {
+                            goodsName = word.words;
+                        } else if (index % 3 == 1) {
+                            String cntStr = match(Receipt.GOODS_COUNT_PATTERN, word.words);
+                            if (!TextUtils.isEmpty(cntStr)) {
+                                count = (int) matchNumber(cntStr);
+                                count = count > 0 ? count : 1;
+                            } else {
+                                index ++;
+                                count = 1;
+                                price = matchNumber(word.words);
+                                price = price > 0 ? price : 0;
+
+                                if (!TextUtils.isEmpty(goodsName) && count > 0 && price >= 0) {
+                                    Receipt.Goods goods = receipt.new Goods();
+                                    goods.mName = goodsName;
+                                    goods.price = price;
+
+                                    receipt.mGoods.put(goods, count);
+
+                                    goodsName = null;
+                                    count = -1;
+                                    price = -1;
+                                }
+                            }
+                        } else if (index % 3 == 2) {
+                            price = matchNumber(word.words);
+                            price = price > 0 ? price : 0;
+
+                            if (!TextUtils.isEmpty(goodsName) && count > 0 && price >= 0) {
+                                Receipt.Goods goods = receipt.new Goods();
+                                goods.mName = goodsName;
+                                goods.price = price;
+
+                                receipt.mGoods.put(goods, count);
+
+                                goodsName = null;
+                                count = -1;
+                                price = -1;
+                            }
+                        }
+
+                        if (start == end && !TextUtils.isEmpty(goodsName)) {
+                            Receipt.Goods goods = receipt.new Goods();
+                            goods.mName = goodsName;
+                            goods.price = price > 0 ? price : 0;
+
+                            receipt.mGoods.put(goods, count > 0 ? count : 1);
+
+                            goodsName = null;
+                            count = -1;
+                            price = -1;
+                        }
+
+                        index ++;
+                    }
+                }
+            }
             for (ReceiptBean.WordBean goodsCountWord : goodsTemp) {
                 int index = bean.words_result.indexOf(goodsCountWord);
                 if (index >= 1 && index <= bean.words_result.size() - 2) {
@@ -239,6 +307,9 @@ public class DecodeTask extends AsyncTask<Object, ViewGroup, Receipt> {
     }
 
     private float matchNumber(String input) {
+        if (TextUtils.isEmpty(input)) {
+            return -1;
+        }
         Pattern ptn = Pattern.compile("^[0-9]*[0-9]?(\\.[0-9]{1,2})?$");
         Matcher mth = ptn.matcher(input);
         if (mth.find()) {
