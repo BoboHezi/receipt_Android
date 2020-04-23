@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.util.Base64;
@@ -162,8 +163,6 @@ public class Utils {
             if (!filePic.exists()) {
                 filePic.getParentFile().mkdirs();
                 filePic.createNewFile();
-            } else {
-                return;
             }
             FileOutputStream fos = new FileOutputStream(filePic);
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
@@ -234,13 +233,24 @@ public class Utils {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         image.compress(Bitmap.CompressFormat.JPEG, quality, baos);
         int options = 90;
-        while (baos.toByteArray().length / 1024 > 100) {
+        while (baos.toByteArray().length / 1024 > 100 && options > 0) {
             baos.reset();
             image.compress(Bitmap.CompressFormat.JPEG, options, baos);
             options -= 10;
         }
         ByteArrayInputStream isBm = new ByteArrayInputStream(baos.toByteArray());
         Bitmap bitmap = BitmapFactory.decodeStream(isBm, null, null);
+        return bitmap;
+    }
+
+    public static Bitmap zoomImage(Bitmap bgimage, double newWidth,double newHeight) {
+        float width = bgimage.getWidth();
+        float height = bgimage.getHeight();
+        Matrix matrix = new Matrix();
+        float scaleWidth = ((float) newWidth) / width;
+        float scaleHeight = ((float) newHeight) / height;
+        matrix.postScale(scaleWidth, scaleHeight);
+        Bitmap bitmap = Bitmap.createBitmap(bgimage, 0, 0, (int) width,(int) height, matrix, true);
         return bitmap;
     }
 

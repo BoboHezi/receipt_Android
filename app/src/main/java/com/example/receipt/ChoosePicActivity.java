@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -15,6 +16,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import com.bumptech.glide.Glide;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,10 +33,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 public class ChoosePicActivity extends AppCompatActivity {
 
-    private static final String TAG = "ChoosePicActivity";
+        private static final String TAG = "ChoosePicActivity";
 
     public static final Map<String, String> TEMPLATES = new HashMap<String, String>() {
         {
@@ -46,13 +50,13 @@ public class ChoosePicActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.i(TAG, "onCreate: ");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pic);
 
         List<String> filePictures = Utils.getAssetPics(this);
         for (String item : filePictures) {
             filePictures.set(filePictures.indexOf(item), "assets#" + item);
-            Log.i(TAG, "item: " + item);
         }
 
         RecyclerView rv = findViewById(R.id.receipt_rv);
@@ -168,18 +172,30 @@ public class ChoosePicActivity extends AppCompatActivity {
 
                         int rawSize = new FileInputStream(new File(picturePath)).available();
                         int quality = rawSize > 1048576 ? (1048576 * 100 / rawSize) : 100;
-                        Log.i(TAG, "raw size: " + rawSize + ", quality: " + quality);
+                        float scale = (float) quality / 100f;
 
-                        Bitmap raw = BitmapFactory.decodeFile(picturePath);
-                        Bitmap cache = Utils.compressImage(raw, quality);
+                        Bitmap raw = Glide.with(ChoosePicActivity.this).asBitmap()
+                                .load(new File(picturePath))
+                                .skipMemoryCache(true)
+                                .submit()
+                                .get();
 
+                        int width = (int) (raw.getWidth() * scale);
+                        int height = (int) (raw.getHeight() * scale);
+                        Bitmap cache = Utils.zoomImage(raw, width, height);
                         Utils.saveBitmap(cache, cacheFile);
+
+                        Log.i(TAG, "raw: " + raw.getWidth() + "x" + raw.getHeight() + ", cacheBmp: " + width + "x" + height);
 
                         return true;
                     } catch (FileNotFoundException e) {
                         Log.e(TAG, "FileNotFoundException: ", e);
                     } catch (IOException e) {
                         Log.e(TAG, "IOException: ", e);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (ExecutionException e) {
+                        e.printStackTrace();
                     }
                     return false;
                 }
