@@ -149,7 +149,7 @@ public class DecodeTask extends AsyncTask<Object, ViewGroup, Receipt> {
                                 count = (int) matchNumber(cntStr);
                                 count = count > 0 ? count : 1;
                             } else {
-                                index ++;
+                                index++;
                                 count = 1;
                                 price = matchNumber(word.words);
                                 price = price > 0 ? price : 0;
@@ -195,7 +195,7 @@ public class DecodeTask extends AsyncTask<Object, ViewGroup, Receipt> {
                             price = -1;
                         }
 
-                        index ++;
+                        index++;
                     }
                 }
             }

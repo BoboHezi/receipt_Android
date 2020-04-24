@@ -3,7 +3,7 @@
     <string name="action_settings">Settings</string>
     <string name="title_receipt">提取小票信息</string>
     <string name="pick_picture">选择图片</string>
-    
+
     <string name="shop_name">商品名：<xliff:g id="name">%s</xliff:g></string>
     <string name="receipt_time">小票日期：<xliff:g id="name">%s</xliff:g></string>
     <string name="goods">商品详情：</string>

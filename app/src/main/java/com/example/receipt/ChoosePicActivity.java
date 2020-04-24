@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutionException;
 
 public class ChoosePicActivity extends AppCompatActivity {
 
-        private static final String TAG = "ChoosePicActivity";
+    private static final String TAG = "ChoosePicActivity";
 
     public static final Map<String, String> TEMPLATES = new HashMap<String, String>() {
         {
@@ -150,7 +150,7 @@ public class ChoosePicActivity extends AppCompatActivity {
         if ((requestCode & 0b100) == 0b100 && resultCode == RESULT_OK) {
             Uri selectedImage = data.getData();
 
-            String[] filePathColumn = { MediaStore.Images.Media.DATA };
+            String[] filePathColumn = {MediaStore.Images.Media.DATA};
             Cursor cursor = getContentResolver().query(selectedImage,
                     filePathColumn, null, null, null);
             cursor.moveToFirst();

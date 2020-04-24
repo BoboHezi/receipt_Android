@@ -33,7 +33,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-        private static final String TAG = "MainActivity";
+    private static final String TAG = "MainActivity";
 
     public static final String OCR_UPLOAD_URL = "http://59.110.234.164:8070/api/ocr/upFile";
 

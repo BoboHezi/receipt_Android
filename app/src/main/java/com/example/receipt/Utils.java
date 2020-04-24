@@ -26,13 +26,11 @@ import java.util.List;
 
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.FormBody;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
-import okhttp3.Response;
 
 public class Utils {
 
@@ -243,14 +241,14 @@ public class Utils {
         return bitmap;
     }
 
-    public static Bitmap zoomImage(Bitmap bgimage, double newWidth,double newHeight) {
+    public static Bitmap zoomImage(Bitmap bgimage, double newWidth, double newHeight) {
         float width = bgimage.getWidth();
         float height = bgimage.getHeight();
         Matrix matrix = new Matrix();
         float scaleWidth = ((float) newWidth) / width;
         float scaleHeight = ((float) newHeight) / height;
         matrix.postScale(scaleWidth, scaleHeight);
-        Bitmap bitmap = Bitmap.createBitmap(bgimage, 0, 0, (int) width,(int) height, matrix, true);
+        Bitmap bitmap = Bitmap.createBitmap(bgimage, 0, 0, (int) width, (int) height, matrix, true);
         return bitmap;
     }
 
