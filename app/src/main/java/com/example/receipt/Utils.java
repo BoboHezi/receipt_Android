@@ -36,7 +36,15 @@ public class Utils {
 
     private static final String TAG = "Utils";
 
-    public static void uploadFile(String path, String url, Callback callback) {
+    /**
+     * 接口上传图片
+     *
+     * @param path     本地路径
+     * @param type     类型
+     * @param url      接口路径
+     * @param callback
+     */
+    public static void uploadFile(String path, int type, String url, Callback callback) {
         // 文件
         File mFile = new File(path);
 
@@ -48,6 +56,7 @@ public class Utils {
         MultipartBody multipartBody = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("ocr", mFile.getName(), requestBody)
+                .addFormDataPart("type", String.valueOf(type))
                 .build();
 
         Request request = new Request.Builder()
@@ -60,6 +69,12 @@ public class Utils {
         call.enqueue(callback);
     }
 
+    /**
+     * 保存json
+     *
+     * @param data
+     * @param path
+     */
     public static void saveJson(String data, String path) {
         if (!Environment.getExternalStorageState().equals(
                 Environment.MEDIA_MOUNTED)) {
@@ -102,6 +117,12 @@ public class Utils {
         return bitmap;
     }
 
+    /**
+     * 获取assets中的图片文件
+     *
+     * @param context
+     * @return
+     */
     public static List<String> getAssetPics(Context context) {
         AssetManager am = context.getAssets();
         String[] path = null;
@@ -120,20 +141,11 @@ public class Utils {
         return pciPaths;
     }
 
-    public static List<String> getAvailablePics(Context context) {
-        File folder = new File("/sdcard/receipt/");
-
-        List<String> pciPaths = new ArrayList<>();
-        if (folder.exists() && folder.listFiles() != null) {
-            for (File item : folder.listFiles()) {
-                if (!item.isDirectory() && item.getPath().endsWith(".jpg")) {
-                    pciPaths.add(item.getPath());
-                }
-            }
-        }
-        return pciPaths;
-    }
-
+    /**
+     * 保存assets图片到文件下
+     *
+     * @param context
+     */
     public static void saveAssets2File(Context context) {
         String destination = "/sdcard/receipt/";
         for (String item : getAssetPics(context)) {
@@ -173,6 +185,14 @@ public class Utils {
         Log.i(TAG, "saveBitmap success: " + filePic.getAbsolutePath());
     }
 
+    /**
+     * 获取指定大小的图片
+     *
+     * @param path
+     * @param maxWidth
+     * @param maxHeight
+     * @return
+     */
     public static Bitmap revisionImageSize(String path, int maxWidth, int maxHeight) {
         Bitmap bitmap = null;
         try {
@@ -201,8 +221,16 @@ public class Utils {
         return bitmap;
     }
 
-    public static ReceiptBean decodeJson(String path) {
-        ReceiptBean bean = null;
+    /**
+     * 解析文件json为指定类型
+     *
+     * @param path
+     * @param type
+     * @param <T>
+     * @return
+     */
+    public static <T> Object decodeJson(String path, Class<T> type) {
+        T o = null;
         File file = new File(path);
         if (file.exists()) {
             FileInputStream fis;
@@ -216,7 +244,7 @@ public class Utils {
 
                 if (!TextUtils.isEmpty(str)) {
                     Gson gson = new Gson();
-                    bean = gson.fromJson(str, ReceiptBean.class);
+                    o = gson.fromJson(str, type);
                 }
             } catch (FileNotFoundException e) {
                 Log.i(TAG, "FileNotFoundException: " + e.getMessage());
@@ -224,14 +252,49 @@ public class Utils {
                 Log.i(TAG, "IOException: " + e.getMessage());
             }
         }
-        return bean;
+        return o;
     }
 
-    public static Bitmap compressImage(Bitmap image, int quality) {
+    /**
+     * 解析assets json为指定类型
+     *
+     * @param path
+     * @param type
+     * @param <T>
+     * @return
+     */
+    public static <T> Object decodeAssetsJson(Context context, String path, Class<T> type) {
+        T o = null;
+        try {
+            AssetManager am = context.getAssets();
+            InputStream inputStream = am.open(path);
+            byte[] bytes = new byte[inputStream.available()];
+
+            inputStream.read(bytes);
+            inputStream.close();
+            String str = new String(bytes);
+
+            if (!TextUtils.isEmpty(str)) {
+                Gson gson = new Gson();
+                o = gson.fromJson(str, type);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return o;
+    }
+
+    /**
+     *
+     * @param image
+     * @param max kb
+     * @return
+     */
+    public static Bitmap compressImage(Bitmap image, int max) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        image.compress(Bitmap.CompressFormat.JPEG, quality, baos);
+        image.compress(Bitmap.CompressFormat.JPEG, 100, baos);
         int options = 90;
-        while (baos.toByteArray().length / 1024 > 100 && options > 0) {
+        while (baos.toByteArray().length / 1024 > max && options > 0) {
             baos.reset();
             image.compress(Bitmap.CompressFormat.JPEG, options, baos);
             options -= 10;
@@ -241,6 +304,14 @@ public class Utils {
         return bitmap;
     }
 
+    /**
+     * 缩放图片
+     *
+     * @param bgimage
+     * @param newWidth
+     * @param newHeight
+     * @return
+     */
     public static Bitmap zoomImage(Bitmap bgimage, double newWidth, double newHeight) {
         float width = bgimage.getWidth();
         float height = bgimage.getHeight();
@@ -250,26 +321,5 @@ public class Utils {
         matrix.postScale(scaleWidth, scaleHeight);
         Bitmap bitmap = Bitmap.createBitmap(bgimage, 0, 0, (int) width, (int) height, matrix, true);
         return bitmap;
-    }
-
-    public static Bitmap getimage(String srcPath) {
-        BitmapFactory.Options newOpts = new BitmapFactory.Options();
-        newOpts.inJustDecodeBounds = true;
-        newOpts.inJustDecodeBounds = false;
-        int w = newOpts.outWidth;
-        int h = newOpts.outHeight;
-        float hh = 800f;
-        float ww = 480f;
-        int be = 1;
-        if (w > h && w > ww) {
-            be = (int) (newOpts.outWidth / ww);
-        } else if (w < h && h > hh) {
-            be = (int) (newOpts.outHeight / hh);
-        }
-        if (be <= 0)
-            be = 1;
-        newOpts.inSampleSize = be;
-        Bitmap bitmap = BitmapFactory.decodeFile(srcPath, newOpts);
-        return compressImage(bitmap, 100);
     }
 }

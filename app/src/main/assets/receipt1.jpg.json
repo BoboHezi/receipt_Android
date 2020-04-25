@@ -1,0 +1,19 @@
+{
+  "goodoDetail": [
+    {
+      "amount": "13",
+      "goodsName": "蛋肉丝烤肠炒河粉",
+      "number": "1"
+    },
+    {
+      "amount": "6",
+      "goodsName": "卤鸡腿不是很辣,一般温度",
+      "number": "1"
+    }
+  ],
+  "payAmount": "￥25",
+  "payDate": "2017年09月26日15:42:46",
+  "shopName": "沙县小吃",
+  "totalAmount": "￥25",
+  "totalNum": 2
+}

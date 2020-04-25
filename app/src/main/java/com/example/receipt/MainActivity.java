@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Response;
@@ -20,7 +21,9 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.gson.Gson;
@@ -54,12 +57,12 @@ public class MainActivity extends AppCompatActivity {
 
         receiptContainer = findViewById(R.id.receipt_container);
 
-        new DecodeTask().execute(this, "/sdcard/receipt/json/receipt1.jpg.json", null);
-        new DecodeTask().execute(this, "/sdcard/receipt/json/receipt2.jpg.json", null);
-        new DecodeTask().execute(this, "/sdcard/receipt/json/receipt3.jpg.json", null);
-        new DecodeTask().execute(this, "/sdcard/receipt/json/receipt4.jpg.json", receiptContainer);
+        //displayBill("file#/sdcard/receipt/json/receipt3.jpg.json");
     }
 
+    /**
+     * 申请权限
+     */
     private void requestPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             List<String> request = new ArrayList();
@@ -69,7 +72,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
             if (request.isEmpty()) {
-                /*Utils.saveAssets2File(this);*/
+                //保存模板里图片
+                Utils.saveAssets2File(this);
                 return;
             }
             String[] items = new String[request.size()];
@@ -83,25 +87,30 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            //保存模板里图片
+            Utils.saveAssets2File(this);
+        }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK && requestCode == 123) {
+            //获取选中图片的路径和类型
             final String path = data.getStringExtra("file_path");
             final int type = data.getIntExtra("type", 0);
 
-            Log.i(TAG, "onActivityResult: " + path + ", type: " + Integer.toBinaryString(type));
+            Log.i(TAG, "onActivityResult: " + path + ", type: " + type);
             String fileName = new File(path).getName();
             final String jsonFile = "/sdcard/receipt/json/" + fileName + ".json";
 
-            if (new File(jsonFile).exists()) {
-                new DecodeTask().execute(this, jsonFile, findViewById(R.id.receipt_container));
-                //displayReceipt(jsonFile, 1f, 0.4f);
+            if (false && new File(jsonFile).exists()) {
+                //重复文件，不多次通过接口识别
+                displayBill("file#" + jsonFile);
                 Log.i(TAG, "result already exist.");
             } else {
-                Utils.uploadFile(path, OCR_UPLOAD_URL, new Callback() {
+                Utils.uploadFile(path, type, OCR_UPLOAD_URL, new Callback() {
                     @Override
                     public void onFailure(Call call, IOException e) {
                         Log.i(TAG, "onFailure: " + e.toString());
@@ -112,15 +121,18 @@ public class MainActivity extends AppCompatActivity {
                         final String result = response.body().string();
                         Log.i(TAG, "onResponse result: \n" + result);
 
-                        ReceiptBean bean = new Gson().fromJson(result, ReceiptBean.class);
-                        if (bean != null && bean.log_id > 0) {
-                            bean.type = type;
+                        //解析json
+                        BillInfo bill = new Gson().fromJson(result, BillInfo.class);
+                        if (bill != null) {
+                            bill.type = type;
                             GsonBuilder gsonBuilder = new GsonBuilder();
                             gsonBuilder.setPrettyPrinting();
                             Gson gson = gsonBuilder.create();
 
-                            Utils.saveJson(gson.toJson(bean), jsonFile);
-                            runOnUiThread(() -> new DecodeTask().execute(MainActivity.this, jsonFile, findViewById(R.id.receipt_container)));
+                            //保存
+                            Utils.saveJson(gson.toJson(bill), jsonFile);
+                            //显示
+                            runOnUiThread(() -> displayBill("file#" + jsonFile));
                         }
                     }
                 });
@@ -128,9 +140,54 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void displayBill(String path) {
+        BillInfo bill;
+        if (path.startsWith("file#")) {
+            bill = (BillInfo) Utils.decodeJson(path.split("#")[1], BillInfo.class);
+        } else if (path.startsWith("assets#")) {
+            bill = (BillInfo) Utils.decodeAssetsJson(this, path.split("#")[1], BillInfo.class);
+        } else {
+            return;
+        }
+
+        if (bill != null && receiptContainer != null) {
+            Log.i(TAG, bill.toString());
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(getString(R.string.shop_name, bill.shopName));
+            sb.append("\n");
+            sb.append(getString(R.string.receipt_time, bill.payDate));
+            sb.append("\n");
+            sb.append(getString(R.string.goods));
+            if (bill.goodoDetail != null) {
+                for (BillInfo.GoodoDetail goods : bill.goodoDetail) {
+                    sb.append("\n商品名称:");
+                    sb.append(goods.goodsName);
+                    sb.append("\n数量:");
+                    sb.append(goods.number);
+                    sb.append("\n金额:");
+                    sb.append(goods.amount);
+                    sb.append("\n");
+                }
+            }
+            sb.append("\n");
+            sb.append(getString(R.string.actual_price, bill.payAmount));
+            sb.append("\n");
+            sb.append(getString(R.string.total_price, bill.totalAmount));
+            sb.append("\n");
+            sb.append(getString(R.string.goods_count, bill.totalNum));
+
+            TextView tv = findViewById(R.id.bill_info);
+            tv.setText(sb.toString());
+            tv.setTextSize(20);
+            tv.setLineSpacing(10, 1.3f);
+            tv.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
+            //receiptContainer.addView(tv);
+        }
+    }
+
     private void displayReceipt(String path, float sizeScale, float textScale) {
-        ReceiptBean bean = Utils.decodeJson(path);
-        FrameLayout container = findViewById(R.id.receipt_container);
+        ReceiptBean bean = (ReceiptBean) Utils.decodeJson(path, ReceiptBean.class);
 
         if (bean.words_result_num > 0) {
             int maxWidth = 0;
@@ -144,7 +201,7 @@ public class MainActivity extends AppCompatActivity {
 
             Log.i(TAG, "screenWidth: " + screenWidth + ", maxWidth: " + maxWidth + ", scale: " + scale);
 
-            container.removeAllViews();
+            receiptContainer.removeAllViews();
             for (ReceiptBean.WordBean word : bean.words_result) {
                 TextView tv = new TextView(this);
                 tv.setText(word.words);
@@ -152,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
                 tv.setMinWidth((int) (word.location.width * sizeScale * scale));
                 tv.setMinHeight((int) (word.location.height * sizeScale * scale));
                 tv.setLineSpacing(1, 10);
-                container.addView(tv);
+                receiptContainer.addView(tv);
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) tv.getLayoutParams();
                 lp.width = FrameLayout.LayoutParams.WRAP_CONTENT;
                 lp.height = FrameLayout.LayoutParams.WRAP_CONTENT;

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -8,15 +8,29 @@
     tools:context=".MainActivity"
     tools:showIn="@layout/activity_main">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:fillViewport="true">
 
         <FrameLayout
             android:id="@+id/receipt_container"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/scroll_top_margin"
             android:layout_gravity="center"
-            android:background="@drawable/receipt_bg" />
-    </ScrollView>
-</androidx.constraintlayout.widget.ConstraintLayout>
+            android:padding="5dp">
+
+            <TextView
+                android:id="@+id/bill_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/receipt_bg"
+                android:padding="5dp"
+                android:textAlignment="center"
+                android:layout_gravity="top|center"
+                android:textSize="17sp"
+                android:text="小票信息提取\n点击右上角开始使用" />
+        </FrameLayout>
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

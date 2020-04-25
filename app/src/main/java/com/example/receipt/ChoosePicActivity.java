@@ -4,8 +4,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -39,12 +37,15 @@ public class ChoosePicActivity extends AppCompatActivity {
 
     private static final String TAG = "ChoosePicActivity";
 
+    //1048576
+    public static final int MAX_FILE_SIZE = 400 * 1024;
+
     public static final Map<String, String> TEMPLATES = new HashMap<String, String>() {
         {
             put("receipt1.jpg", "美团订单");
             put("receipt2.jpg", "饿了么订单");
-            put("receipt3.jpg", "沃尔玛小票");
-            put("receipt4.jpg", "普通小票");
+            put("receipt3.jpg", "优衣库小票");
+            put("receipt4.jpg", "超市小票");
         }
     };
 
@@ -54,6 +55,7 @@ public class ChoosePicActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_pic);
 
+        //加载assets里的模板
         List<String> filePictures = Utils.getAssetPics(this);
         for (String item : filePictures) {
             filePictures.set(filePictures.indexOf(item), "assets#" + item);
@@ -96,6 +98,7 @@ public class ChoosePicActivity extends AppCompatActivity {
             }
             path = path.split("#")[1];
 
+            //显示信息
             if (type == 1) {
                 holder.thumbnail.setImageBitmap(Utils.getAssetsBitmap(ChoosePicActivity.this, path));
             } else if (type == 2) {
@@ -113,13 +116,13 @@ public class ChoosePicActivity extends AppCompatActivity {
             holder.itemView.setOnClickListener(view -> {
                 int requestCode = 0;
                 if (finalPath.contains("receipt1")) {
-                    requestCode = Receipt.TYPE_MEITUAN;
+                    requestCode = BillInfo.TYPE_MEITUAN;
                 } else if (finalPath.contains("receipt2")) {
-                    requestCode = Receipt.TYPE_ELE;
+                    requestCode = BillInfo.TYPE_ELE;
                 } else if (finalPath.contains("receipt3")) {
-                    requestCode = Receipt.TYPE_WALMART;
+                    requestCode = BillInfo.TYPE_MARKET;
                 } else if (finalPath.contains("receipt4")) {
-                    requestCode = Receipt.TYPE_OTHER;
+                    requestCode = BillInfo.TYPE_OTHER;
                 }
                 Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
                 startActivityForResult(intent, requestCode);
@@ -147,9 +150,10 @@ public class ChoosePicActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        if ((requestCode & 0b100) == 0b100 && resultCode == RESULT_OK) {
+        if ((requestCode & 0b000) == 0b000 && resultCode == RESULT_OK) {
             Uri selectedImage = data.getData();
 
+            //获取选中的图片文件
             String[] filePathColumn = {MediaStore.Images.Media.DATA};
             Cursor cursor = getContentResolver().query(selectedImage,
                     filePathColumn, null, null, null);
@@ -166,13 +170,15 @@ public class ChoosePicActivity extends AppCompatActivity {
                 @Override
                 protected Object doInBackground(Object[] objects) {
                     try {
-                        if (new File(cacheFile).exists()) {
+                        /*if (new File(cacheFile).exists()) {
                             return true;
-                        }
+                        }*/
 
+                        //压缩图片到指定大小, 保存到固定路径下
                         int rawSize = new FileInputStream(new File(picturePath)).available();
-                        int quality = rawSize > 1048576 ? (1048576 * 100 / rawSize) : 100;
-                        float scale = (float) quality / 100f;
+                        int quality = rawSize > MAX_FILE_SIZE ? (MAX_FILE_SIZE * 100 / rawSize) : 100;
+                        quality = quality <= 0 ? 100 : quality;
+                        float sizeScale = (float) quality / 100f;
 
                         Bitmap raw = Glide.with(ChoosePicActivity.this).asBitmap()
                                 .load(new File(picturePath))
@@ -180,12 +186,26 @@ public class ChoosePicActivity extends AppCompatActivity {
                                 .submit()
                                 .get();
 
-                        int width = (int) (raw.getWidth() * scale);
-                        int height = (int) (raw.getHeight() * scale);
+                        int width = (int) (raw.getWidth() * sizeScale);
+                        int height = (int) (raw.getHeight() * sizeScale);
                         Bitmap cache = Utils.zoomImage(raw, width, height);
                         Utils.saveBitmap(cache, cacheFile);
 
-                        Log.i(TAG, "raw: " + raw.getWidth() + "x" + raw.getHeight() + ", cacheBmp: " + width + "x" + height);
+                        Log.i(TAG, "rawSize: " + rawSize +
+                                ", cacheSize: " + new FileInputStream(new File(cacheFile)).available() + "" +
+                                ", quality: " + quality);
+
+                        /*int sedRawSize = new FileInputStream(new File(cacheFile)).available();
+                        if (sedRawSize > MAX_FILE_SIZE) {
+                            int sedQuality = sedRawSize > MAX_FILE_SIZE ? (MAX_FILE_SIZE * 100 / rawSize) : 100;
+                            sedQuality = Math.max(sedQuality, 10);
+                            float sedScale = (float) sedQuality / 100f;
+                            int SedWidth = (int) (cache.getWidth() * sedScale);
+                            int sedHeight = (int) (cache.getHeight() * sedScale);
+                            Bitmap sedCache = Utils.zoomImage(cache, SedWidth, sedHeight);
+                            Utils.saveBitmap(sedCache, cacheFile);
+                            Log.i(TAG, "cache: " + cache.getWidth() + "x" + cache.getHeight() + ", sedCacheBmp: " + SedWidth + "x" + sedHeight);
+                        }*/
 
                         return true;
                     } catch (FileNotFoundException e) {
@@ -204,6 +224,7 @@ public class ChoosePicActivity extends AppCompatActivity {
                 protected void onPostExecute(Object o) {
                     super.onPostExecute(o);
                     if ((Boolean) o) {
+                        //图片处理完毕，返回数据到MainActivity
                         setResult(RESULT_OK, new Intent()
                                 .putExtra("file_path", cacheFile)
                                 .putExtra("type", requestCode));
