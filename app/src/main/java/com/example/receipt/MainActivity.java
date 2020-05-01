@@ -1,51 +1,37 @@
 package com.example.receipt;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import androidx.core.widget.NestedScrollView;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Response;
 
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.bumptech.glide.Glide;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -54,6 +40,8 @@ public class MainActivity extends AppCompatActivity {
     public static final String OCR_UPLOAD_URL = "http://59.110.234.164:8070/api/ocr/upFile";
 
     private TextView receiptContainer;
+
+    private LinearLayout rawDataContainer;
 
     private static final String[] NEEDED_PERMISSIONS = {
             Manifest.permission.INTERNET, Manifest.permission.CAMERA, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE
@@ -69,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
         requestPermission();
 
         receiptContainer = findViewById(R.id.bill_info);
+
+        rawDataContainer = findViewById(R.id.raw_data);
 
         //displayBill("assets#receipt1.jpg.json");
     }
@@ -163,7 +153,19 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        if (bill != null && receiptContainer != null) {
+        if (bill.imgType) {
+            receiptContainer.setVisibility(View.VISIBLE);
+            rawDataContainer.setVisibility(View.GONE);
+            displayBill(bill);
+        } else {
+            receiptContainer.setVisibility(View.GONE);
+            rawDataContainer.setVisibility(View.VISIBLE);
+            displayRawData(bill, 0.3f, 0.2f);
+        }
+    }
+
+    private void displayBill(BillInfo bill) {
+        if (receiptContainer != null) {
             Log.i(TAG, bill.toString());
 
             StringBuilder sb = new StringBuilder();
@@ -192,16 +194,14 @@ public class MainActivity extends AppCompatActivity {
 
             receiptContainer.setText(sb.toString());
             receiptContainer.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-
-            NestedScrollView.LayoutParams lp = (NestedScrollView.LayoutParams) receiptContainer.getLayoutParams();
-            lp.gravity = Gravity.TOP | Gravity.CENTER;
-
-            receiptContainer.setLayoutParams(lp);
         }
     }
 
-    private void displayReceipt(String path, float sizeScale, float textScale) {
-        ReceiptBean bean = (ReceiptBean) Utils.decodeJson(path, ReceiptBean.class);
+    private void displayRawData(BillInfo bill, float sizeScale, float textScale) {
+        if (bill == null || TextUtils.isEmpty(bill.data)) {
+            return;
+        }
+        ReceiptBean bean = new Gson().fromJson(bill.data, ReceiptBean.class);
 
         if (bean.words_result_num > 0) {
             int maxWidth = 0;
@@ -215,7 +215,7 @@ public class MainActivity extends AppCompatActivity {
 
             Log.i(TAG, "screenWidth: " + screenWidth + ", maxWidth: " + maxWidth + ", scale: " + scale);
 
-            //receiptContainer.removeAllViews();
+            rawDataContainer.removeAllViews();
             for (ReceiptBean.WordBean word : bean.words_result) {
                 TextView tv = new TextView(this);
                 tv.setText(word.words);
@@ -223,13 +223,13 @@ public class MainActivity extends AppCompatActivity {
                 tv.setMinWidth((int) (word.location.width * sizeScale * scale));
                 tv.setMinHeight((int) (word.location.height * sizeScale * scale));
                 tv.setLineSpacing(1, 10);
-                //receiptContainer.addView(tv);
-                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) tv.getLayoutParams();
-                lp.width = FrameLayout.LayoutParams.WRAP_CONTENT;
-                lp.height = FrameLayout.LayoutParams.WRAP_CONTENT;
+                rawDataContainer.addView(tv);
+                LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) tv.getLayoutParams();
+                lp.width = LinearLayout.LayoutParams.WRAP_CONTENT;
+                lp.height = LinearLayout.LayoutParams.WRAP_CONTENT;
 
-                lp.topMargin = (int) (word.location.top * sizeScale * scale);
-                lp.leftMargin = (int) (word.location.left * sizeScale * scale);
+                lp.topMargin = (int) (word.location.top * sizeScale * scale * 0.2);
+                lp.leftMargin = (int) (word.location.left * sizeScale * scale * 0.2);
                 tv.setLayoutParams(lp);
             }
         }

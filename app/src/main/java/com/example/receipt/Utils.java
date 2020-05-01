@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.os.Environment;
 import android.text.TextUtils;
-import android.util.Base64;
 import android.util.Log;
 
 import com.google.gson.Gson;
@@ -285,9 +284,8 @@ public class Utils {
     }
 
     /**
-     *
      * @param image
-     * @param max kb
+     * @param max   kb
      * @return
      */
     public static Bitmap compressImage(Bitmap image, int max) {

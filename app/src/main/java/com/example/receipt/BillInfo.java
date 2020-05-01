@@ -23,6 +23,10 @@ public class BillInfo {
     String totalAmount;
     //总数量
     int totalNum;
+    //原始数据
+    String data;
+    //图片标记
+    boolean imgType = true;
 
     class GoodoDetail {
         //商品名
